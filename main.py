@@ -1,4 +1,3 @@
-```python
 import streamlit as st
 import pandas as pd
 
@@ -121,4 +120,3 @@ except Exception as e:
     st.error("데이터를 불러오는 중 문제가 발생했습니다.")
     st.info("인터넷 연결 또는 데이터 주소를 확인해주세요.")
     st.code(str(e))
-```
