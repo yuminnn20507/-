@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+import plotly.graph_objects as go
 
 # 페이지 설정
 st.set_page_config(
@@ -8,8 +9,12 @@ st.set_page_config(
     layout="wide"
 )
 
+# 제목
 st.title("🌡️ 서울의 연평균 기온 변화")
-st.write("서울의 기온 데이터를 이용해 약 100년 동안 연평균 기온이 어떻게 변해왔는지 살펴봅니다.")
+st.write(
+    "서울의 기온 데이터를 이용해 약 100년 동안 "
+    "연평균 기온이 어떻게 변해왔는지 살펴봅니다."
+)
 
 # 데이터 주소
 DATA_URL = "https://raw.githubusercontent.com/greatsong/modudata/main/data/seoul.csv"
@@ -20,9 +25,16 @@ DATA_URL = "https://raw.githubusercontent.com/greatsong/modudata/main/data/seoul
 def load_data():
     df = pd.read_csv(DATA_URL, encoding="utf-8")
 
+    # 날짜 변환
     df["날짜"] = pd.to_datetime(df["날짜"], errors="coerce")
-    df["평균기온"] = pd.to_numeric(df["평균기온"], errors="coerce")
 
+    # 평균기온 숫자로 변환
+    df["평균기온"] = pd.to_numeric(
+        df["평균기온"],
+        errors="coerce"
+    )
+
+    # 필요한 데이터가 없는 행 제거
     df = df.dropna(subset=["날짜", "평균기온"])
 
     return df
@@ -44,12 +56,9 @@ try:
     # 연도순 정렬
     yearly_temp = yearly_temp.sort_values("연도")
 
-    # -----------------------------------------
-    # 중요!
-    # 데이터가 없는 연도도 포함시키고
-    # 해당 연도의 기온을 NaN으로 설정
-    # -----------------------------------------
-
+    # ------------------------------------------
+    # 모든 연도를 만들기
+    # ------------------------------------------
     start_year = int(yearly_temp["연도"].min())
     end_year = int(yearly_temp["연도"].max())
 
@@ -57,16 +66,26 @@ try:
         "연도": range(start_year, end_year + 1)
     })
 
+    # 실제 데이터와 모든 연도를 합치기
     yearly_temp = all_years.merge(
         yearly_temp,
         on="연도",
         how="left"
     )
 
-    # 연도를 인덱스로 설정
-    chart_data = yearly_temp.set_index("연도")
+    # ------------------------------------------
+    # 데이터가 없는 연도는 NaN 상태로 유지
+    # Plotly에서 None으로 처리하면
+    # 해당 구간의 선이 끊어짐
+    # ------------------------------------------
+    yearly_temp["평균기온"] = yearly_temp["평균기온"].where(
+        yearly_temp["평균기온"].notna(),
+        None
+    )
 
-    # 기본 정보
+    # ------------------------------------------
+    # 상단 정보
+    # ------------------------------------------
     col1, col2, col3 = st.columns(3)
 
     with col1:
@@ -89,26 +108,65 @@ try:
 
     st.divider()
 
+    # ------------------------------------------
     # 그래프
+    # ------------------------------------------
     st.subheader("📈 연도별 연평균 기온")
 
-    st.line_chart(
-        chart_data,
-        y="평균기온",
-        x_label="연도",
-        y_label="평균기온 (℃)",
-        height=500
+    fig = go.Figure()
+
+    fig.add_trace(
+        go.Scatter(
+            x=yearly_temp["연도"],
+            y=yearly_temp["평균기온"],
+            mode="lines+markers",
+            name="연평균 기온",
+            connectgaps=False,
+            hovertemplate=
+                "연도 %{x}년<br>"
+                "평균기온 %{y:.1f}℃"
+                "<extra></extra>"
+        )
+    )
+
+    fig.update_layout(
+        xaxis_title="연도",
+        yaxis_title="평균기온 (℃)",
+        height=500,
+        hovermode="x unified",
+        margin=dict(
+            l=20,
+            r=20,
+            t=20,
+            b=20
+        )
+    )
+
+    st.plotly_chart(
+        fig,
+        use_container_width=True
     )
 
     st.caption(
-        "※ 데이터가 없는 연도는 그래프에서 선이 연결되지 않습니다."
+        "※ 기온 데이터가 없는 연도는 0℃로 표시하지 않고 "
+        "그래프의 선을 끊어서 표시했습니다."
     )
 
+    # ------------------------------------------
     # 데이터 표
+    # ------------------------------------------
     with st.expander("📋 연도별 기온 데이터 보기"):
+
         display_data = yearly_temp.copy()
-        display_data["평균기온"] = display_data["평균기온"].round(1)
-        display_data.columns = ["연도", "연평균 기온 (℃)"]
+
+        display_data["평균기온"] = display_data[
+            "평균기온"
+        ].round(1)
+
+        display_data.columns = [
+            "연도",
+            "연평균 기온 (℃)"
+        ]
 
         st.dataframe(
             display_data,
