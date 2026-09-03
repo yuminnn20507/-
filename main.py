@@ -23,10 +23,17 @@ DATA_URL = "https://raw.githubusercontent.com/greatsong/modudata/main/data/seoul
 # 데이터 불러오기
 @st.cache_data
 def load_data():
-    df = pd.read_csv(DATA_URL, encoding="utf-8")
+
+    df = pd.read_csv(
+        DATA_URL,
+        encoding="utf-8"
+    )
 
     # 날짜 변환
-    df["날짜"] = pd.to_datetime(df["날짜"], errors="coerce")
+    df["날짜"] = pd.to_datetime(
+        df["날짜"],
+        errors="coerce"
+    )
 
     # 평균기온 숫자로 변환
     df["평균기온"] = pd.to_numeric(
@@ -34,19 +41,25 @@ def load_data():
         errors="coerce"
     )
 
-    # 필요한 데이터가 없는 행 제거
-    df = df.dropna(subset=["날짜", "평균기온"])
+    # 날짜와 평균기온이 모두 있는 데이터만 사용
+    df = df.dropna(
+        subset=["날짜", "평균기온"]
+    )
 
     return df
 
 
 try:
+
+    # 데이터 불러오기
     df = load_data()
 
     # 연도 추출
     df["연도"] = df["날짜"].dt.year
 
+    # --------------------------------------
     # 연도별 평균기온 계산
+    # --------------------------------------
     yearly_temp = (
         df.groupby("연도")["평균기온"]
         .mean()
@@ -56,48 +69,33 @@ try:
     # 연도순 정렬
     yearly_temp = yearly_temp.sort_values("연도")
 
-    # ------------------------------------------
-    # 모든 연도를 만들기
-    # ------------------------------------------
-    start_year = int(yearly_temp["연도"].min())
-    end_year = int(yearly_temp["연도"].max())
-
-    all_years = pd.DataFrame({
-        "연도": range(start_year, end_year + 1)
-    })
-
-    # 실제 데이터와 모든 연도를 합치기
-    yearly_temp = all_years.merge(
-        yearly_temp,
-        on="연도",
-        how="left"
+    # --------------------------------------
+    # 데이터가 실제로 존재하는 연도만 사용
+    # --------------------------------------
+    yearly_temp["평균기온"] = pd.to_numeric(
+        yearly_temp["평균기온"],
+        errors="coerce"
     )
 
-    # ------------------------------------------
-    # 데이터가 없는 연도는 NaN 상태로 유지
-    # Plotly에서 None으로 처리하면
-    # 해당 구간의 선이 끊어짐
-    # ------------------------------------------
-    yearly_temp["평균기온"] = yearly_temp["평균기온"].where(
-        yearly_temp["평균기온"].notna(),
-        None
+    yearly_temp = yearly_temp.dropna(
+        subset=["평균기온"]
     )
 
-    # ------------------------------------------
+    # --------------------------------------
     # 상단 정보
-    # ------------------------------------------
+    # --------------------------------------
     col1, col2, col3 = st.columns(3)
 
     with col1:
         st.metric(
             "데이터 시작 연도",
-            f"{start_year}년"
+            f"{int(yearly_temp['연도'].min())}년"
         )
 
     with col2:
         st.metric(
             "데이터 마지막 연도",
-            f"{end_year}년"
+            f"{int(yearly_temp['연도'].max())}년"
         )
 
     with col3:
@@ -108,9 +106,9 @@ try:
 
     st.divider()
 
-    # ------------------------------------------
+    # --------------------------------------
     # 그래프
-    # ------------------------------------------
+    # --------------------------------------
     st.subheader("📈 연도별 연평균 기온")
 
     fig = go.Figure()
@@ -121,19 +119,26 @@ try:
             y=yearly_temp["평균기온"],
             mode="lines+markers",
             name="연평균 기온",
+
+            # 없는 데이터를 임의로 연결하지 않음
             connectgaps=False,
-            hovertemplate=
+
+            hovertemplate=(
                 "연도 %{x}년<br>"
                 "평균기온 %{y:.1f}℃"
                 "<extra></extra>"
+            )
         )
     )
 
     fig.update_layout(
         xaxis_title="연도",
         yaxis_title="평균기온 (℃)",
+
         height=500,
-        hovermode="x unified",
+
+        hovermode="x",
+
         margin=dict(
             l=20,
             r=20,
@@ -148,13 +153,12 @@ try:
     )
 
     st.caption(
-        "※ 기온 데이터가 없는 연도는 0℃로 표시하지 않고 "
-        "그래프의 선을 끊어서 표시했습니다."
+        "※ 기온 데이터가 없는 연도는 그래프에서 제외했습니다."
     )
 
-    # ------------------------------------------
+    # --------------------------------------
     # 데이터 표
-    # ------------------------------------------
+    # --------------------------------------
     with st.expander("📋 연도별 기온 데이터 보기"):
 
         display_data = yearly_temp.copy()
@@ -174,7 +178,15 @@ try:
             hide_index=True
         )
 
+
 except Exception as e:
-    st.error("데이터를 불러오는 중 문제가 발생했습니다.")
-    st.info("인터넷 연결 또는 데이터 주소를 확인해주세요.")
+
+    st.error(
+        "데이터를 불러오는 중 문제가 발생했습니다."
+    )
+
+    st.info(
+        "인터넷 연결 또는 데이터 주소를 확인해주세요."
+    )
+
     st.code(str(e))
