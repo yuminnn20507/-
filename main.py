@@ -165,10 +165,12 @@ try:
     # 마지막 구간 추가
     if segment_years:
         fig.add_trace(
-            go.Scatter(
-                x=segment_years,
-                y=segment_temps,
-                mode="lines+markers",
+           go.Scatter(
+    x=segment_years,
+    y=segment_temps,
+    mode="lines+markers",
+    line=dict(color="#0066CC"),
+    marker=dict(color="#0066CC"),
                 name="연평균 기온",
                 showlegend=False,
                 hovertemplate=(
